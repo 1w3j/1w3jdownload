@@ -1,0 +1,29 @@
+.wp_rp_title {
+    margin-top: 15px;
+}
+
+.wp_rp_title:visited {
+    color: red !important;
+}
+
+.entry-title a:visited {
+    color: red !important;
+}
+
+.copy-button-1w3j,
+.download-button-1w3j,
+.highlight-button-1w3j {
+    position: absolute;
+    cursor: pointer;
+    padding: 4px;
+}
+
+.copy-button-1w3j:hover,
+.download-button-1w3j:hover,
+.highlight-button-1w3j:hover {
+    background: #4a2f31;
+}
+
+.downloaded-book-1w3j {
+    color: #f5871f !important;
+}
