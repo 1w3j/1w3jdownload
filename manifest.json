@@ -17,6 +17,10 @@
             "css": ["css/allitebooks.css"]
         }
     ],
+    "background": {
+        "scripts": ["js/allitebooksDownload.js"],
+        "persistent": false
+    },
     "web_accessible_resources": ["images/*.png"],
     "icons": {
         "16": "icons/icon-16.png",

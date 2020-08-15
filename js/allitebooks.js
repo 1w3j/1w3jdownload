@@ -1,25 +1,76 @@
-const DATABASE_NAME = "allitebooksDB",
-    DATABASE_VERSION = 1,
-    ICONS_SIZE = 32;
-let ALLITEBOOKS = {
-    DB: null,
-    IMAGES: {
+/**
+ * Main constant object for the allitebooks plugin
+ * @type {
+ *          {
+ *              DB: {
+ *                  INSTANCE: IDBDatabase,
+ *                  NAME: string
+ *                  VERSION: number,
+ *                  OBJECT_STORE: string,
+ *                  KEY_PATH: string
+ *              },
+ *              ICONS: {
+ *                  SIZE: number,
+ *                  COPY: string,
+ *                  DOWNLOAD: string,
+ *                  HIGHLIGHT_ON: string
+ *                  HIGHLIGHT_OFF: string,
+ *              },
+ *              CLASSES: {
+ *                  DOWNLOADED: string,
+ *                  HIGHLIGHT_BUTTON: string
+ *              },
+ *              TEXT:{
+ *                  MARK_THIS_BOOK: string,
+ *                  UNMARK_THIS_BOOK: string
+ *              }
+ *          }
+ *       }
+ */
+const ALLITEBOOKS = {
+    DB: {
+        INSTANCE: null,
+        NAME: "allitebooksDB",
+        VERSION: 1,
+        OBJECT_STORE: "visitedBooks",
+        KEY_PATH: "bookURL",
+    },
+    ICONS: {
+        SIZE: 32,
         COPY: chrome.extension.getURL("images/copy-48.png"),
         DOWNLOAD: chrome.extension.getURL("images/download-48.png"),
         HIGHLIGHT_ON: chrome.extension.getURL("images/highlight-on-48.png"),
         HIGHLIGHT_OFF: chrome.extension.getURL("images/highlight-off-48.png"),
     },
+    CLASSES: {
+        DOWNLOADED: "downloaded-book-1w3j",
+        BUTTONS: {
+            COPY: "copy-button-1w3j",
+            DOWNLOAD: "download-button-1w3j",
+            HIGHLIGHT: "highlight-button-1w3j",
+        },
+        PUBLIC: {
+            BOOK_PAGE: {
+                BOOK_TITLE: "single-title",
+                RELATED_BOOKS: "related_post wp_rp",
+                RELATED_BOOK_TITLE: "wp_rp_title",
+                DOWNLOAD_LINKS: "download-links",
+            },
+            LIST_PAGE: { BOOK_TITLE: "entry-title" },
+        },
+    },
+    TEXT: {
+        MARK_THIS_BOOK: "Mark This Book",
+        UNMARK_THIS_BOOK: "Unmark This Book",
+    },
 };
 
 /**
  * Initializes an indexedDB database
- * @param {*} dbObject                      The object that handles the database passed by reference
- * @param {IDBDatabase} dbObject.DB         The IDBDatabase object itself
- * @param {string} dbName                   The name for th database to be created
  * @tutorial https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase
  * @tutorial https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB
  */
-function initializeDB(dbObject, dbName) {
+function initializeDB() {
     window.indexedDB =
         window.indexedDB ||
         window.mozIndexedDB ||
@@ -36,57 +87,34 @@ function initializeDB(dbObject, dbName) {
         );
     } else {
         let openAllitebooksDBRequest = window.indexedDB.open(
-            DATABASE_NAME,
-            DATABASE_VERSION
+            ALLITEBOOKS.DB.NAME,
+            ALLITEBOOKS.DB.VERSION
         );
         openAllitebooksDBRequest.onerror = (e) =>
             console.error(
-                DATABASE_NAME +
+                ALLITEBOOKS.DB.NAME +
                     "DB open request:\n" +
                     e.target +
                     "\nCheck if you didn't allow the website to indexedDB databases. The feature 'Already downloaded highlighting' won't be available"
             );
         openAllitebooksDBRequest.onsuccess = (e) => {
-            dbObject.DB = openAllitebooksDBRequest.result;
+            ALLITEBOOKS.DB.INSTANCE = openAllitebooksDBRequest.result;
         };
-        openAllitebooksDBRequest.onupgradeneeded = function (e) {
-            dbObject.DB = e.target.result;
-            dbObject.DB.onerror = (e) =>
+        openAllitebooksDBRequest.onupgradeneeded = (e) => {
+            ALLITEBOOKS.DB.INSTANCE = e.target.result;
+            ALLITEBOOKS.DB.INSTANCE.onerror = (e) =>
                 console.error(
-                    DATABASE_NAME +
+                    ALLITEBOOKS.DB.NAME +
                         "DB open request:\n" +
                         e +
                         "\nError on database upgrade. The feature 'Already downloaded highlighting' won't be available"
                 );
-            const objectStore = dbObject.DB.createObjectStore("visitedBooks", {
-                keyPath: "bookURL",
-            });
-            const booksData = [
+            ALLITEBOOKS.DB.INSTANCE.createObjectStore(
+                ALLITEBOOKS.DB.OBJECT_STORE,
                 {
-                    bookURL:
-                        "http://www.allitebooks.org/basic-linux-terminal-tips-and-tricks",
-                    bookTitle: "Delphi Quick Syntax Reference",
-                },
-                {
-                    bookURL:
-                        "http://www.allitebooks.org/beginning-jakarta-ee-web-development-3rd-edition",
-                    bookTitle: "Beginning Jakarta EE Web Development",
-                },
-                {
-                    bookURL:
-                        "http://www.allitebooks.org/basic-linux-terminal-tips-and-tricks",
-                    bookTitle: "Basic Linux Terminal Tips and Tricks",
-                },
-            ];
-            objectStore.transaction.oncomplete = (e) => {
-                let booksVisitedStore = dbObject.DB.transaction(
-                    "visitedBooks",
-                    "readwrite"
-                ).objectStore("visitedBooks");
-                booksData.forEach((book) => {
-                    booksVisitedStore.add(book);
-                });
-            };
+                    keyPath: ALLITEBOOKS.DB.KEY_PATH,
+                }
+            );
         };
     }
 }
@@ -101,13 +129,15 @@ function cleanURL(url) {
     return url.replace(regex, "").trim();
 }
 
-function downloadBook(url, bookTitle) {
-    chrome.downloads.download({
-        url: url,
-        filename: bookTitle,
-        conflictAction: "uniquify",
-        saveAs: false,
-    });
+function downloadBooks(downloadLinks, bookTitle) {
+    for (let i = 0; i < downloadLinks.length; i++)
+        chrome.runtime.sendMessage(downloadLinks.href);
+    // chrome.downloads.download({
+    //     url: url,
+    //     filename: bookTitle,
+    //     conflictAction: "uniquify",
+    //     saveAs: false,
+    // });
 }
 
 /**
@@ -118,11 +148,11 @@ function downloadBook(url, bookTitle) {
 function checkIfBookAlreadyDownloaded(url) {
     return new Promise((resolve, reject) => {
         console.log("searching: " + cleanURL(url));
-        let searchBookURLRequest = ALLITEBOOKS.DB.transaction(
-            "visitedBooks",
+        let searchBookURLRequest = ALLITEBOOKS.DB.INSTANCE.transaction(
+            ALLITEBOOKS.DB.OBJECT_STORE,
             "readonly"
         )
-            .objectStore("visitedBooks")
+            .objectStore(ALLITEBOOKS.DB.OBJECT_STORE)
             .get(cleanURL(url));
         searchBookURLRequest.onerror = (e) => {
             console.log("Search Book URL Request Error:\n" + e);
@@ -136,8 +166,11 @@ function checkIfBookAlreadyDownloaded(url) {
 
 function addDownloadedBook(url, bookTitle) {
     console.log("adding: " + url);
-    let addBookRequest = ALLITEBOOKS.DB.transaction("visitedBooks", "readwrite")
-        .objectStore("visitedBooks")
+    let addBookRequest = ALLITEBOOKS.DB.INSTANCE.transaction(
+        ALLITEBOOKS.DB.OBJECT_STORE,
+        "readwrite"
+    )
+        .objectStore(ALLITEBOOKS.DB.OBJECT_STORE)
         .add({ bookURL: cleanURL(url), bookTitle: bookTitle });
     addBookRequest.onerror = (e) => {
         console.log("Add Book Request Error:");
@@ -151,11 +184,11 @@ function addDownloadedBook(url, bookTitle) {
 
 function removeBook(url) {
     console.log("removing: " + url);
-    let removeBookRequest = ALLITEBOOKS.DB.transaction(
-        "visitedBooks",
+    let removeBookRequest = ALLITEBOOKS.DB.INSTANCE.transaction(
+        ALLITEBOOKS.DB.OBJECT_STORE,
         "readwrite"
     )
-        .objectStore("visitedBooks")
+        .objectStore(ALLITEBOOKS.DB.OBJECT_STORE)
         .delete(cleanURL(url));
     removeBookRequest.onerror = (e) => {
         console.log("Add Book Request Error:");
@@ -171,15 +204,14 @@ function highlightBook(element, url, bookTitle, highlightButton) {
     checkIfBookAlreadyDownloaded(url).then((alreadyDownloaded) => {
         if (alreadyDownloaded) {
             removeBook(url);
-            if (element.classList.contains("downloaded-book-1w3j"))
-                element.classList.remove("downloaded-book-1w3j");
-            highlightButton.src = ALLITEBOOKS.IMAGES.HIGHLIGHT_OFF;
-            highlightButton.title = "Mark This Book";
+            element.classList.remove(ALLITEBOOKS.CLASSES.DOWNLOADED);
+            highlightButton.src = ALLITEBOOKS.ICONS.HIGHLIGHT_OFF;
+            highlightButton.title = ALLITEBOOKS.TEXT.MARK_THIS_BOOK;
         } else {
             addDownloadedBook(url, bookTitle);
-            element.classList.add("downloaded-book-1w3j");
-            highlightButton.src = ALLITEBOOKS.IMAGES.HIGHLIGHT_ON;
-            highlightButton.title = "Unmark This Book";
+            element.classList.add(ALLITEBOOKS.CLASSES.DOWNLOADED);
+            highlightButton.src = ALLITEBOOKS.ICONS.HIGHLIGHT_ON;
+            highlightButton.title = ALLITEBOOKS.TEXT.UNMARK_THIS_BOOK;
         }
     });
 }
@@ -246,14 +278,16 @@ function putCopyButtonOn(element, textToCopy) {
     let copyButton = document.createElement("img"),
         regex = /®|!|:|,|(\s–\s)|(\s-\s)|(1st Edition)|(First Edition)|(2nd Edition)|(Second Edition)|(3rd Edition)|(Third Edition)|(4th Edition)|(Fourth Edition)|(5th Edition)|(Fifth Edition)|(6th Edition)|(Sixth Edition)|(7th Edition)|(8th Edition)|(9th Edition)|(10th Edition)|(11th Edition)|(12th Edition)|(13th Edition)|(14th Edition)|(15th Edition)|(16th Edition)|(17th Edition)|(18th Edition)|(19th Edition)|(20th Edition)/g;
     textToCopy = textToCopy.replace(regex, "").trim();
-    copyButton.className = "copy-button-1w3j";
-    copyButton.src = ALLITEBOOKS.IMAGES.COPY;
+    copyButton.className = ALLITEBOOKS.CLASSES.BUTTONS.COPY;
+    copyButton.src = ALLITEBOOKS.ICONS.COPY;
     copyButton.title = 'Copy "' + textToCopy + '"';
-    copyButton.height = ICONS_SIZE;
-    copyButton.width = ICONS_SIZE;
+    copyButton.height = ALLITEBOOKS.ICONS.SIZE;
+    copyButton.width = ALLITEBOOKS.ICONS.SIZE;
     copyButton.style.top = cumulativeOffset(element).top + "px";
     copyButton.style.left =
-        element.getBoundingClientRect().right - ICONS_SIZE / 2 + "px";
+        element.getBoundingClientRect().right -
+        ALLITEBOOKS.ICONS.SIZE / 2 +
+        "px";
     copyButton.onclick = () => copy(textToCopy);
     document.body.appendChild(copyButton);
 }
@@ -262,59 +296,90 @@ function putCopyButtonOn(element, textToCopy) {
  * Adds a button next to the element, when the user clicks the button, url will be automatically downloaded
  * without prompting any dialog, and using filename as the full base name for the file
  * @param element - the element to put the button next to
- * @param url - the url that will be downloaded
+ * @param downloadLinks - the download links elements (html tag '<a>') that have the urls to be downloaded
  * @param filename - a file name that the download file will have
  */
-function putDownloadButtonOn(element, url, filename) {
+function putDownloadButtonOn(element, downloadLinks, filename) {
     let downloadButton = document.createElement("img");
-    downloadButton.className = "download-button-1w3j";
-    downloadButton.src = ALLITEBOOKS.IMAGES.DOWNLOAD;
+    downloadButton.className = ALLITEBOOKS.CLASSES.BUTTONS.DOWNLOAD;
+    downloadButton.src = ALLITEBOOKS.ICONS.DOWNLOAD;
     downloadButton.title = 'Download "' + filename + '"';
-    downloadButton.height = ICONS_SIZE;
-    downloadButton.width = ICONS_SIZE;
+    downloadButton.height = ALLITEBOOKS.ICONS.SIZE;
+    downloadButton.width = ALLITEBOOKS.ICONS.SIZE;
     downloadButton.style.top = cumulativeOffset(element).top + "px";
     downloadButton.style.left =
-        element.getBoundingClientRect().right - ICONS_SIZE * 1.5 + "px";
-    downloadButton.onclick = () => downloadBook(url, filename);
+        element.getBoundingClientRect().right -
+        ALLITEBOOKS.ICONS.SIZE * 1.5 +
+        "px";
+    downloadButton.onclick = () => downloadBooks(downloadLinks, filename);
     document.body.appendChild(downloadButton);
 }
 
 /**
  * Adds a button next to the element, when the user clicks the button, url will be searched on an indexeddb
  * database, if url does not exist on the database, then the element text color will change to whatever color was set
- * on .downloaded-book-1w3j class, then it will be added a new entry on the database using url as key and bookTitle as
+ * on {@link ALLITEBOOKS.CLASSES.DOWNLOADED}, then it will be added a new entry on the database using url as key and bookTitle as
  * a value. If url does exist on the database, then the respective entry will be removed from the database and the
- * .downloaded-book-1w3j class will be removed
- * @param element - the element to put the button next to
- * @param url - the url that will be searched for on the database
- * @param bookTitle - the book title that would be added together with the url
+ * {@link ALLITEBOOKS.CLASSES.DOWNLOADED} class will be removed
+ * @param {Element} element - the element to put the button next to
+ * @param {string} url - the url that will be searched for on the database
+ * @param {string} bookTitle - the book title that would be added together with the `url`
+ * @param {boolean} [doNotCheckIfDownloaded=false] - if passed as true, then it causes the function to recheck if the
+ * book was already downloaded. Otherwise it will assume `bookTitle` and `url` are already on the database. This was
+ * added just to avoid double-checking the same `url` on the database. First check it's done when looking for
+ * `window.href` and the second time {@link checkIfBookAlreadyDownloaded} was called happens inside this function
+ * for toggling the highlight button. So we just avoid double calling it using a `boolean`.
  */
-function putHighlightButtonOn(element, url, bookTitle) {
+function putHighlightButtonOn(
+    element,
+    url,
+    bookTitle,
+    doNotCheckIfDownloaded = false
+) {
     let highlightButton = document.createElement("img");
-    highlightButton.className = "highlight-button-1w3j";
-    checkIfBookAlreadyDownloaded(url).then((alreadyDownloaded) => {
-        highlightButton.src = alreadyDownloaded
-            ? ALLITEBOOKS.IMAGES.HIGHLIGHT_ON
-            : ALLITEBOOKS.IMAGES.HIGHLIGHT_OFF;
-        highlightButton.title = alreadyDownloaded
-            ? "Unmark This Book"
-            : "Mark This Book";
-    });
-    highlightButton.height = ICONS_SIZE;
-    highlightButton.width = ICONS_SIZE;
+    highlightButton.className = ALLITEBOOKS.CLASSES.BUTTONS.HIGHLIGHT;
+    if (doNotCheckIfDownloaded) {
+        highlightButton.src = ALLITEBOOKS.ICONS.HIGHLIGHT_ON;
+        highlightButton.title = ALLITEBOOKS.TEXT.UNMARK_THIS_BOOK;
+    } else {
+        checkIfBookAlreadyDownloaded(url).then((alreadyDownloaded) => {
+            highlightButton.src = alreadyDownloaded
+                ? ALLITEBOOKS.ICONS.HIGHLIGHT_ON
+                : ALLITEBOOKS.ICONS.HIGHLIGHT_OFF;
+            highlightButton.title = alreadyDownloaded
+                ? ALLITEBOOKS.TEXT.UNMARK_THIS_BOOK
+                : ALLITEBOOKS.TEXT.MARK_THIS_BOOK;
+        });
+    }
+    highlightButton.height = ALLITEBOOKS.ICONS.SIZE;
+    highlightButton.width = ALLITEBOOKS.ICONS.SIZE;
     highlightButton.style.top =
-        element.classList.contains("wp_rp_title") ||
-        element.classList.contains("entry-title")
-            ? cumulativeOffset(element).top + ICONS_SIZE + "px"
+        element.classList.contains(
+            ALLITEBOOKS.CLASSES.PUBLIC.BOOK_PAGE.RELATED_BOOK_TITLE
+        ) ||
+        element.classList.contains(
+            ALLITEBOOKS.CLASSES.PUBLIC.LIST_PAGE.BOOK_TITLE
+        )
+            ? cumulativeOffset(element).top + ALLITEBOOKS.ICONS.SIZE + "px"
             : cumulativeOffset(element).top + "px";
     highlightButton.style.left =
-        element.classList.contains("wp_rp_title") ||
-        element.classList.contains("entry-title")
-            ? element.getBoundingClientRect().right - ICONS_SIZE / 2 + "px"
-            : element.getBoundingClientRect().right - ICONS_SIZE * 2.5 + "px";
+        element.classList.contains(
+            ALLITEBOOKS.CLASSES.PUBLIC.BOOK_PAGE.RELATED_BOOK_TITLE
+        ) ||
+        element.classList.contains(
+            ALLITEBOOKS.CLASSES.PUBLIC.LIST_PAGE.BOOK_TITLE
+        )
+            ? element.getBoundingClientRect().right -
+              ALLITEBOOKS.ICONS.SIZE / 2 +
+              "px"
+            : element.getBoundingClientRect().right -
+              ALLITEBOOKS.ICONS.SIZE * 2.5 +
+              "px";
     highlightButton.onclick = () =>
         highlightBook(
-            element.classList.contains("entry-title")
+            element.classList.contains(
+                ALLITEBOOKS.CLASSES.PUBLIC.LIST_PAGE.BOOK_TITLE
+            )
                 ? element.getElementsByTagName("a")[0]
                 : element,
             url,
@@ -324,7 +389,7 @@ function putHighlightButtonOn(element, url, bookTitle) {
     document.body.appendChild(highlightButton);
 }
 
-initializeDB(ALLITEBOOKS, DATABASE_NAME);
+initializeDB();
 
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
@@ -334,34 +399,40 @@ if (document.readyState === "loading") {
             )
         ) {
             // adding copy-download buttons to the book title on the book page
-            let bookTitle = document.getElementsByClassName("single-title")[0], // The book title heading
+            let bookTitle = document.getElementsByClassName(
+                    ALLITEBOOKS.CLASSES.PUBLIC.BOOK_PAGE.BOOK_TITLE
+                )[0], // The book title heading
                 bookSubtitle =
                     bookTitle.nextElementSibling.tagName === "H4"
                         ? bookTitle.nextElementSibling.innerText
                         : false,
                 relatedBooks = document.getElementsByClassName(
-                    // The related books cards
-                    "related_post wp_rp"
-                )[0];
+                    // The related books small cards at the bottom of the page
+                    ALLITEBOOKS.CLASSES.PUBLIC.BOOK_PAGE.RELATED_BOOKS
+                )[0],
+                downloadLinks = document.getElementsByClassName(
+                    ALLITEBOOKS.CLASSES.PUBLIC.BOOK_PAGE.DOWNLOAD_LINKS
+                );
             putCopyButtonOn(bookTitle, bookTitle.innerText);
             checkIfBookAlreadyDownloaded(window.location.href).then(
                 (alreadyDownloaded) => {
                     if (alreadyDownloaded)
-                        bookTitle.classList.add("downloaded-book-1w3j");
+                        bookTitle.classList.add(ALLITEBOOKS.CLASSES.DOWNLOADED);
+                    putHighlightButtonOn(
+                        bookTitle,
+                        window.location.href,
+                        bookSubtitle
+                            ? bookTitle.innerText + " " + bookSubtitle
+                            : bookTitle.innerText,
+                        true
+                    );
                 }
             );
             if (bookSubtitle)
                 putCopyButtonOn(bookTitle.nextElementSibling, bookSubtitle);
             putDownloadButtonOn(
                 bookTitle,
-                bookTitle,
-                bookSubtitle
-                    ? bookTitle.innerText + " " + bookSubtitle
-                    : bookTitle.innerText
-            );
-            putHighlightButtonOn(
-                bookTitle,
-                window.location.href,
+                downloadLinks,
                 bookSubtitle
                     ? bookTitle.innerText + " " + bookSubtitle
                     : bookTitle.innerText
@@ -370,13 +441,15 @@ if (document.readyState === "loading") {
             for (let i = 0; i < relatedBooks.childElementCount; i++) {
                 let relatedBookTitle = relatedBooks
                     .getElementsByTagName("li")
-                    [i].getElementsByClassName("wp_rp_title")[0];
+                    [i].getElementsByClassName(
+                        ALLITEBOOKS.CLASSES.PUBLIC.BOOK_PAGE.RELATED_BOOK_TITLE
+                    )[0];
                 putCopyButtonOn(relatedBookTitle, relatedBookTitle.innerText);
                 checkIfBookAlreadyDownloaded(relatedBookTitle.href).then(
                     (alreadyDownloaded) => {
                         if (alreadyDownloaded)
                             relatedBookTitle.classList.add(
-                                "downloaded-book-1w3j"
+                                ALLITEBOOKS.CLASSES.DOWNLOADED
                             );
                     }
                 );
@@ -388,7 +461,9 @@ if (document.readyState === "loading") {
             }
         } else {
             // adding a copy button to each book title on books lists type of pages
-            let bookTitles = document.getElementsByClassName("entry-title");
+            let bookTitles = document.getElementsByClassName(
+                ALLITEBOOKS.CLASSES.PUBLIC.LIST_PAGE.BOOK_TITLE
+            );
             for (let i = 0; i < bookTitles.length; i++) {
                 const bookURLElement = bookTitles[i].getElementsByTagName(
                     "a"
@@ -398,7 +473,7 @@ if (document.readyState === "loading") {
                     (alreadyDownloaded) => {
                         if (alreadyDownloaded)
                             bookURLElement.classList.add(
-                                "downloaded-book-1w3j"
+                                ALLITEBOOKS.CLASSES.DOWNLOADED
                             );
                     }
                 );
