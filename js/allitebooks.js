@@ -18,7 +18,22 @@
  *              },
  *              CLASSES: {
  *                  DOWNLOADED: string,
- *                  HIGHLIGHT_BUTTON: string
+ *                  BUTTONS: {
+ *                      COPY: string,
+ *                      DOWNLOAD: string,
+ *                      HIGHLIGHT: string
+ *                  },
+ *                  PUBLIC: {
+ *                      BOOK_PAGE: {
+ *                          BOOK_TITLE: string,
+ *                          RELATED_BOOKS: string,
+ *                          RELATED_BOOK_TITLE: string,
+ *                          DOWNLOAD_LINKS: string
+ *                      },
+ *                      LIST_PAGE:{
+ *                          BOOK_TITLE: string
+ *                      }
+ *                  }
  *              },
  *              TEXT:{
  *                  MARK_THIS_BOOK: string,
@@ -121,7 +136,7 @@ function initializeDB() {
 
 /**
  * Removes a trailing slash on url, then trims any trailing or leading whitespaces
- * @param url - the URL
+ * @param {string} url - the URL
  * @returns {string} - the 'cleaned' URL
  */
 function cleanURL(url) {
@@ -129,6 +144,9 @@ function cleanURL(url) {
     return url.replace(regex, "").trim();
 }
 
+/**
+ * TODO
+ */
 function downloadBooks(downloadLinks, bookTitle) {
     for (let i = 0; i < downloadLinks.length; i++)
         chrome.runtime.sendMessage(downloadLinks.href);
@@ -143,7 +161,8 @@ function downloadBooks(downloadLinks, bookTitle) {
 /**
  * Checks if the book was marked as downloaded, which means the URL is already stored on the database
  * @param {string} url - The book URL
- * @returns {Promise}
+ * @returns {Promise} - A {@link Promise} containing a resolve function with a boolean as its parameter which equals
+ * to true if the `url` exists on the indexeddb database
  */
 function checkIfBookAlreadyDownloaded(url) {
     return new Promise((resolve, reject) => {
@@ -164,6 +183,11 @@ function checkIfBookAlreadyDownloaded(url) {
     });
 }
 
+/**
+ * Adds `url` to the indexeddb database with `bookTitle` as its value
+ * @param {string} url -  the url of the book to be added as a key on {@link ALLITEBOOKS.DB.OBJECT_STORE}
+ * @param {string} bookTitle - the book title of the url
+ */
 function addDownloadedBook(url, bookTitle) {
     console.log("adding: " + url);
     let addBookRequest = ALLITEBOOKS.DB.INSTANCE.transaction(
@@ -182,6 +206,10 @@ function addDownloadedBook(url, bookTitle) {
     };
 }
 
+/**
+ * Remove `url` off the indexeddb database
+ * @param {string} url -  the url as a key path of the book to be removed from {@link ALLITEBOOKS.DB.OBJECT_STORE}
+ */
 function removeBook(url) {
     console.log("removing: " + url);
     let removeBookRequest = ALLITEBOOKS.DB.INSTANCE.transaction(
@@ -200,6 +228,18 @@ function removeBook(url) {
     };
 }
 
+/**
+ * Toggles `highlightButton` icon color and font color of `element` according to the existence of `url` on
+ * {@link ALLITEBOOKS.DB.OBJECT_STORE}
+ * @param {Element} element - usually takes the HTML {@link Element} under the following CSS classes:
+ * {@link ALLITEBOOKS.CLASSES.PUBLIC.BOOK_PAGE.BOOK_TITLE} and {@link ALLITEBOOKS.CLASSES.PUBLIC.LIST_PAGE.BOOK_TITLE}
+ * @param {string} url - the URL path that will be checked if exists or not on the database
+ * @param {string} bookTitle - the complete book title to be added on the database, you may ask why not just get
+ * `element.innerText`. That's because that `element`'s innerText usually just contains the book's title, and not a full
+ * name like title + subtitle, which is the desired format for being stored in the database
+ * @param {Element} highlightButton - the button IMG tag that will be changed in color according to the existence of `url` in the
+ * database
+ */
 function highlightBook(element, url, bookTitle, highlightButton) {
     checkIfBookAlreadyDownloaded(url).then((alreadyDownloaded) => {
         if (alreadyDownloaded) {
