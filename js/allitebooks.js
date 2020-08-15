@@ -424,7 +424,7 @@ if (document.readyState === "loading") {
                         bookSubtitle
                             ? bookTitle.innerText + " " + bookSubtitle
                             : bookTitle.innerText,
-                        true
+                        alreadyDownloaded
                     );
                 }
             );
@@ -451,12 +451,13 @@ if (document.readyState === "loading") {
                             relatedBookTitle.classList.add(
                                 ALLITEBOOKS.CLASSES.DOWNLOADED
                             );
+                        putHighlightButtonOn(
+                            relatedBookTitle,
+                            relatedBookTitle.href,
+                            relatedBookTitle.innerText,
+                            alreadyDownloaded
+                        );
                     }
-                );
-                putHighlightButtonOn(
-                    relatedBookTitle,
-                    relatedBookTitle.href,
-                    relatedBookTitle.innerText
                 );
             }
         } else {
@@ -475,12 +476,13 @@ if (document.readyState === "loading") {
                             bookURLElement.classList.add(
                                 ALLITEBOOKS.CLASSES.DOWNLOADED
                             );
+                        putHighlightButtonOn(
+                            bookTitles[i],
+                            bookURLElement.href,
+                            bookTitles[i].innerText,
+                            alreadyDownloaded
+                        );
                     }
-                );
-                putHighlightButtonOn(
-                    bookTitles[i],
-                    bookURLElement.href,
-                    bookTitles[i].innerText
                 );
             }
         }
