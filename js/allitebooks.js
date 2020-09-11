@@ -148,8 +148,10 @@ function cleanURL(url) {
  * TODO
  */
 function downloadBooks(downloadLinks, bookTitle) {
-    for (let i = 0; i < downloadLinks.length; i++)
-        chrome.runtime.sendMessage(downloadLinks.href);
+    for (let i = 0; i < downloadLinks.length; i++) {
+        console.log("clicked");
+        chrome.runtime.sendMessage(downloadLinks[i].href);
+    }
     // chrome.downloads.download({
     //     url: url,
     //     filename: bookTitle,
@@ -316,7 +318,7 @@ function copy(text) {
  */
 function putCopyButtonOn(element, textToCopy) {
     let copyButton = document.createElement("img"),
-        regex = /®|!|:|,|(\s–\s)|(\s-\s)|(1st Edition)|(First Edition)|(2nd Edition)|(Second Edition)|(3rd Edition)|(Third Edition)|(4th Edition)|(Fourth Edition)|(5th Edition)|(Fifth Edition)|(6th Edition)|(Sixth Edition)|(7th Edition)|(8th Edition)|(9th Edition)|(10th Edition)|(11th Edition)|(12th Edition)|(13th Edition)|(14th Edition)|(15th Edition)|(16th Edition)|(17th Edition)|(18th Edition)|(19th Edition)|(20th Edition)/g;
+        regex = /™|©|®|!|:|,|\/|(–\s)|(-\s)|('s)|(’s)|(1st Edition)|(First Edition)|(2nd Edition)|(Second Edition)|(3rd Edition)|(Third Edition)|(4th Edition)|(Fourth Edition)|(5th Edition)|(Fifth Edition)|(6th Edition)|(Sixth Edition)|(7th Edition)|(8th Edition)|(9th Edition)|(10th Edition)|(11th Edition)|(12th Edition)|(13th Edition)|(14th Edition)|(15th Edition)|(16th Edition)|(17th Edition)|(18th Edition)|(19th Edition)|(20th Edition)/g;
     textToCopy = textToCopy.replace(regex, "").trim();
     copyButton.className = ALLITEBOOKS.CLASSES.BUTTONS.COPY;
     copyButton.src = ALLITEBOOKS.ICONS.COPY;

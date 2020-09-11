@@ -1,6 +1,5 @@
-chrome.runtime.onMessage.addListener(function (arg, sender, sendResponse) {
-    let args = arg.collection;
-    console.log(args);
+chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+    console.log(message);
     // for (i in args) {
     //     let url = args[i];
     //     chrome.downloads.download({
