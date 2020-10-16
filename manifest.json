@@ -11,7 +11,7 @@
     "permissions": ["downloads"],
     "content_scripts": [
         {
-            "matches": ["*://www.allitebooks.org/*"],
+            "matches": ["*://www.allitebooks.org/*", "*://www.allitebooks.com/*"],
             "run_at": "document_start",
             "js": ["js/allitebooks.js"],
             "css": ["css/allitebooks.css"]

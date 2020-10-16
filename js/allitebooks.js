@@ -437,7 +437,7 @@ if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
         if (
             cleanURL(window.location.href).match(
-                /(http|https):\/\/www.allitebooks.org\/(?!page\/).*/
+                /(http|https):\/\/www.allitebooks\.(org|com)\/(?!page\/).*/
             )
         ) {
             // adding copy-download buttons to the book title on the book page
